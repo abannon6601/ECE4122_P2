@@ -23,7 +23,7 @@ public:
   void      SaveImageData(const char* newFileName, Complex* d, int w, int h);
   void      SaveImageDataReal(const char* newFileName, Complex* d, int w, int h);
 private:
-  int w;         // width of image
-  int h;         // height of image
-  Complex* data; // The data
+int w;         // width of image
+int h;         // height of image
+Complex* data; // The data
 };
