@@ -146,7 +146,7 @@ void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int invers
                 H[workingIndex] = h[workingIndex]*temp;
             }
 
-            H[workingIndex] = h[workingIndex];      // TODO insert real DFT function here
+            //H[workingIndex] = h[workingIndex];      
         }
     }
 
