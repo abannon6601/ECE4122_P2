@@ -9,24 +9,28 @@
 #include <thread>
 #include <future>
 #include <algorithm>
+#include <mutex>
+#include <math.h>
 
 #include "Complex.h"
 #include "InputImage.h"
 
 constexpr unsigned int NUMTHREADS = 4;
 
-void Transform1D(Complex *h, int w, Complex *H, int numberInSequence);
-void Transform2D(const char* inputFN);
-void Transpose(Complex* input, int w, Complex* output);
+void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int inverse);
+void Transform2D(const char *inputFN, int inverse);
+void Transpose(Complex *input, int w);
 void do_join(std::thread& t);
 
 using namespace std;
+
+std::mutex debug;
 
 //undergrad students can assume NUMTHREADS will evenly divide the number of rows in tested images
 //graduate students should assume NUMTHREADS will not always evenly divide the number of rows in tested images.
 //I will test with a different image than the one given
 
-void Transform2D(const char* inputFN) 
+void Transform2D(const char *inputFN, int inverse)
 { // Do the 2D transform here.
   // 1) Use the InputImage object to read in the Tower.txt file and
   //    find the width/height of the input image.
@@ -49,22 +53,69 @@ void Transform2D(const char* inputFN)
 
     for(int i = 0; i < NUMTHREADS; ++i)
     {
-        //std::future<void> myFuture0 = std::async(Transform1D, h, image.GetWidth(), H, i);
-        vectors.push_back(std::thread(Transform1D, h, image.GetWidth(), H, i));
+        vectors.push_back(std::thread(Transform1D, h, image.GetWidth(), H, i, inverse)); // fire vectors at the problem
+        //std::cout << "FFT2D_DEBUG: Running thread: " << i << std::endl;
     }
+    //std::cout << "FFT2D_DEBUG: Running " << vectors.size() << " threads" << std::endl;
 
-    std::for_each(vectors.begin(),vectors.end(),do_join);
+    std::for_each(vectors.begin(),vectors.end(),do_join);   // ensure all threads are complete before continuing
+    vectors.clear();
 
+    //return;     //TODO DEBUG REMOVE
 
+    // row calculations now complete
+
+    Transpose(H, image.GetWidth());  // transpose the result matrix
+
+     for(int i = 0; i < image.GetWidth()*image.GetHeight(); ++i) // copy the result matrix back into the orginal array
+     {
+         h[i] = H[i];
+     }
+
+     for(int i = 0; i < NUMTHREADS; ++i)
+     {
+         vectors.push_back(std::thread(Transform1D, h, image.GetWidth(), H, i, inverse)); // fire vectors at the problem
+     }
+
+     std::for_each(vectors.begin(),vectors.end(),do_join);   // ensure all threads are complete before continuing
+     vectors.clear();
+
+     // colomb calculations now complete
+
+     Transpose(H, image.GetWidth());  // transpose the result matrix
+
+    string filename = "MyAfter2D.txt";
+
+    image.SaveImageData(filename.c_str(),H,image.GetWidth(),image.GetHeight());
 }
 
+void Transpose(Complex *input, int dim) // transposes the square matrix  *input of dimention dim
+{
+    Complex *HoldingInput  = new Complex[dim * dim]; // Allocate a working array
+
+    int x,y;
+    for(y = 0; y <dim; ++y)
+    {
+        for(x = 0; x <dim; ++x)
+        {
+           HoldingInput[x + y*dim] = input[x*dim + y];
+        }
+    }
+
+    for(int i = 0; i < dim*dim; ++i)
+    {
+        input[i] = HoldingInput[i];
+    }
+
+    delete(HoldingInput);
+}
 
 void do_join(std::thread& t)
 {
     t.join();
 }
 
-void Transform1D(Complex *h, int w, Complex *H, int numberInSequence)
+void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int inverse)
 {
     // Implement a simple 1-d DFT using the double summation equation
     // given in the assignment handout.  h is the time-domain input
@@ -72,32 +123,37 @@ void Transform1D(Complex *h, int w, Complex *H, int numberInSequence)
     // nunmberInSequence tells the funciton how many calls have already been made, and so where it should
     // start in the h array.
 
+    Complex j = Complex(0,1);
+    Complex W;
+    W.imag = inverse * (sin((2*M_PI)/w));
+    W.real = cos((2*M_PI)/w);
+
     int startPoint   = ((w*w)/NUMTHREADS)*numberInSequence;  // where each thread will start working in the array
     int numberOfRows = w/NUMTHREADS; // we can assume the image is square
 
     int workingIndex = 0;
     for(int i = 0; i < numberOfRows; ++i)
     {
-        workingIndex = i + startPoint;
-        H[workingIndex] = h[workingIndex];      // TODO insert real DFT function here
+        for(int x = 0; x < w; ++x)
+        {
+            workingIndex = startPoint + x + i*w;
+
+            // sum of all the 
+
+            H[workingIndex] = h[workingIndex];      // TODO insert real DFT function here
+        }
     }
 
-}
-
-void Transpose(Complex* input, int w, Complex* output)
-{
-    // write a function to transpose the array
 }
 
 int main(int argc, char** argv)
 {
-  string fn("Tower.txt"); // default file name
+  string fn("test.txt"); // default file name
   if (argc > 1) fn = string(argv[1]);  // if name specified on cmd line
-    {
-        Transform2D(fn.c_str()); // Perform the transform.
 
-        //InverseTansform2D();
-    }
+    Transform2D(fn.c_str(), -1); // Perform the transform.
+    // Transform2D(fn.c_str(), 1); // Perform the inverse transform.
+
 }
   
 
