@@ -54,14 +54,12 @@ void Transform2D(const char *inputFN, int inverse)
     for(int i = 0; i < NUMTHREADS; ++i)
     {
         vectors.push_back(std::thread(Transform1D, h, image.GetWidth(), H, i, inverse)); // fire vectors at the problem
-        //std::cout << "FFT2D_DEBUG: Running thread: " << i << std::endl;
+        std::cout << "FFT2D_DEBUG: Running thread: " << i << std::endl;
     }
-    //std::cout << "FFT2D_DEBUG: Running " << vectors.size() << " threads" << std::endl;
+    std::cout << "FFT2D_DEBUG: Running " << vectors.size() << " threads" << std::endl;
 
     std::for_each(vectors.begin(),vectors.end(),do_join);   // ensure all threads are complete before continuing
     vectors.clear();
-
-    //return;     //TODO DEBUG REMOVE
 
     // row calculations now complete
 
@@ -132,13 +130,21 @@ void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int invers
     int numberOfRows = w/NUMTHREADS; // we can assume the image is square
 
     int workingIndex = 0;
+    Complex temp(1,0);
     for(int i = 0; i < numberOfRows; ++i)
     {
         for(int x = 0; x < w; ++x)
         {
             workingIndex = startPoint + x + i*w;
 
-            // sum of all the 
+            for(int k = 0; k < (w-1); ++k)
+            {
+                for(int nk = 0; nk < x*k; ++nk)
+                {
+                    temp = W*temp;
+                }
+                H[workingIndex] = h[workingIndex]*temp;
+            }
 
             H[workingIndex] = h[workingIndex];      // TODO insert real DFT function here
         }
@@ -148,7 +154,7 @@ void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int invers
 
 int main(int argc, char** argv)
 {
-  string fn("test.txt"); // default file name
+  string fn("Tower.txt"); // default file name
   if (argc > 1) fn = string(argv[1]);  // if name specified on cmd line
 
     Transform2D(fn.c_str(), -1); // Perform the transform.
