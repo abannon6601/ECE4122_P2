@@ -1,6 +1,9 @@
 // Distributed two-dimensional Discrete FFT transform
 // ALAN BANNON
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -9,7 +12,6 @@
 #include <thread>
 #include <future>
 #include <algorithm>
-#include <mutex>
 #include <math.h>
 
 #include "Complex.h"
@@ -24,7 +26,6 @@ void do_join(std::thread& t);
 
 using namespace std;
 
-std::mutex debug;
 
 //undergrad students can assume NUMTHREADS will evenly divide the number of rows in tested images
 //graduate students should assume NUMTHREADS will not always evenly divide the number of rows in tested images.
@@ -54,9 +55,9 @@ void Transform2D(const char *inputFN, int inverse)
     for(int i = 0; i < NUMTHREADS; ++i)
     {
         vectors.push_back(std::thread(Transform1D, h, image.GetWidth(), H, i, inverse)); // fire vectors at the problem
-        std::cout << "FFT2D_DEBUG: Running thread: " << i << std::endl;
+    //    std::cout << "FFT2D_DEBUG: Running thread: " << i << std::endl;
     }
-    std::cout << "FFT2D_DEBUG: Running " << vectors.size() << " threads" << std::endl;
+    //std::cout << "FFT2D_DEBUG: Running " << vectors.size() << " threads" << std::endl;
 
     std::for_each(vectors.begin(),vectors.end(),do_join);   // ensure all threads are complete before continuing
     vectors.clear();
@@ -130,23 +131,39 @@ void Transform1D(Complex *h, int w, Complex *H, int numberInSequence, int invers
     int numberOfRows = w/NUMTHREADS; // we can assume the image is square
 
     int workingIndex = 0;
-    Complex temp(1,0);
-    for(int i = 0; i < numberOfRows; ++i)
+    int rowStartIndex = 0;
+
+    Complex sum_holdder(1,0);
+    Complex w_n(1,0);
+    Complex w_nk(1,0);
+
+    for(int i = 0; i < numberOfRows; i++)
     {
-        for(int x = 0; x < w; ++x)
+        w_n.real = 1;
+        w_n.imag = 0;
+
+        rowStartIndex = startPoint + i*w;
+
+        for(int n = 0; n < w; n++)
         {
-            workingIndex = startPoint + x + i*w;
+            workingIndex = rowStartIndex + n;
 
-            for(int k = 0; k < (w-1); ++k)
+            sum_holdder.real = 0;
+            sum_holdder.imag = 0;
+
+            w_n.real = 1;
+            w_n.imag = 0;
+
+
+            for(int k = 0; k < (w-1); k++)
             {
-                for(int nk = 0; nk < x*k; ++nk)
-                {
-                    temp = W*temp;
-                }
-                H[workingIndex] = h[workingIndex]*temp;
+                sum_holdder = sum_holdder + w_nk * h[rowStartIndex + k];
+                w_nk = w_nk*w_n;
             }
+            H[workingIndex].real = sum_holdder.real;
+            H[workingIndex].imag = sum_holdder.imag;
 
-            //H[workingIndex] = h[workingIndex];      
+            w_n = w_n * W;
         }
     }
 
